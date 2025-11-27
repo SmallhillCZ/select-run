@@ -71,7 +71,6 @@ const argv = yargs(hideBin(process.argv))
     description: 'Set \'silent\' to the log level of npm.'
 	})
   .parse()
-  console.log(argv)
 
 const [filter] = argv["_"]
 
