@@ -11,13 +11,71 @@ const fuzzy = require('fuzzy')
 const path = require('path');
 const inquirer = require('inquirer');
 const npmRunAll = require("npm-run-all");
-let args;
+const yargs = require('yargs');
+const { hideBin } = require('yargs/helpers');
 
 const packageJsonPath = path.join(process.cwd(), 'package.json');
 
-if(process.argv.length > 2){
-	args = process.argv.slice(2)[0];
-	console.log(chalk.yellow('Pre-filtered on:'), args);
+const argv = yargs(hideBin(process.argv))
+  .command('[filter]', 'select and run scripts', (yargs) => {
+    return yargs.positional('filter', {describe: 'pre-filter scripts'})
+  })
+  .option('aggregate-output', {
+    type: 'boolean',
+    description: 'Avoid interleaving output by delaying printing of each command\'s output until it has finished.'
+  })
+  .option('continue-on-error', {
+    alias: 'c',
+    type: 'boolean',
+    description: 'Set the flag to continue executing other/subsequent tasks even if a task threw an error. \'npm-run-all\' itself will exit with non-zero code if one or more tasks threw error(s).'
+  })
+  .option('max-parallel', {
+    type: 'number',
+    description: 'Set the maximum number of parallelism. Default is unlimited.'
+  })
+  .option('npm-path', {
+    type: 'string',
+    description: 'Set the path to npm. Default is the value of environment variable npm_execpath. If the variable is not defined, then it\'s "npm." In this case, the "npm" command must be found in environment variable PATH.'
+  })
+  .option('print-label', {
+    alias: 'l',
+    type: 'boolean',
+    description: 'Set the flag to print the task name as a prefix on each line of output. Tools in tasks may stop coloring their output if this option was given.'
+  })
+  .option('print-name', {
+    alias: 'n',
+    type: 'boolean',
+    description: 'Set the flag to print the task name before running each task.'
+  })
+  .option('parallel', {
+    alias: 'p',
+    type: 'boolean',
+    description: 'Run a group of tasks in parallel. e.g. \'npm-run-all -p foo bar\' is similar to \'npm run foo & npm run bar\'.'
+  })
+  .option('race', {
+    alias: 'r',
+    type: 'boolean',
+    description: 'Set the flag to kill all tasks when a task finished with zero. This option is valid only with \'parallel\' option.'
+	  })
+  .option('sequential', {
+    alias: 's',
+    type: 'boolean',
+    description: 'Run a group of tasks sequentially. e.g. \'npm-run-all -s foo bar\' is similar to \'npm run foo && npm run bar\'. \'--serial\' is a synonym of \'--sequential\'.'
+  })
+  .option('serial', {
+    type: 'boolean',
+    description: '\'--serial\' is a synonym of \'--sequential\'.'
+  })
+  .option('silent', {
+    type: 'boolean',
+    description: 'Set \'silent\' to the log level of npm.'
+	})
+  .parse()
+
+const [filter] = argv["_"]
+
+if(filter){
+	console.log(chalk.yellow('Pre-filtered on:'), filter);
 }
 
 let packageJson;
@@ -55,9 +113,9 @@ function userInterview () {
 			pageSize: 15,
 			highlight: true,
 			searchable: true,
-			default: [args],
+			default: [filter],
 			source: (_answersSoFar, input) => {
-				input = input || (args ? args : '');
+				input = input || (filter ? filter : '');
 				return new Promise((resolve) => {
 				const fuzzyResult = fuzzy.filter(input, Object.keys(packageJson.scripts));
 				const data = fuzzyResult.map(element => element.original);
@@ -84,10 +142,20 @@ function runSelected({selectedScripts}) {
 		console.log(`\n[ ${chalk.green('running selected scripts')} ]`)
 		npmRunAll(selectedScripts, {
 			stdout: process.stdout,
-			stderr: process.stderr
-			}).catch((err) => {
+			stderr: process.stderr,
+      aggregateOutput: argv['aggregate-output'],
+      continueOnError: argv['continue-on-error'],
+      maxParallel: argv['max-parallel'],
+      npmPath: argv['npm-path'],
+      printLabel: argv['print-label'],
+			parallel: argv['parallel'],
+      printName: argv['print-name'],
+      race: argv['race'],
+      sequential: argv['sequential'] || argv['serial'],
+      silent: argv['silent'],
+    }).catch((err) => {
 			errorMsg(`run-all failed, \n${err}`)
-			});
+    });
 	} else {
 		console.log(chalk.gray('nothing selected'));
 		process.exit(0);
