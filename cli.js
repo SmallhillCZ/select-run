@@ -70,6 +70,12 @@ const argv = yargs(hideBin(process.argv))
     type: 'boolean',
     description: 'Set \'silent\' to the log level of npm.'
 	})
+  .option('group', {
+    alias: 'g',
+    type: 'string',
+    description: 'Group selected scripts under a named group.',
+    array: true
+  })
   .parse()
 
 const [filter] = argv["_"]
@@ -88,6 +94,19 @@ catch(error) {
 }
 
 console.log(chalk.gray(`path: ${packageJsonPath}\n`) );
+
+const packageJsonScripts = Object.keys(packageJson.scripts);
+
+const scripts = [...packageJsonScripts];
+
+if(argv.group){
+  argv.group.forEach(group => {
+    const groupScripts = group.split(',')
+      .map(script => script.trim())
+      .filter(script => packageJsonScripts.includes(script));
+    scripts.unshift(groupScripts.join(', '));
+  });
+}
 
 /* add checkbox-plus to inquirer prompt type */
 inquirer.registerPrompt('checkbox-plus', require('inquirer-checkbox-plus-prompt'));
@@ -117,15 +136,15 @@ function userInterview () {
 			source: (_answersSoFar, input) => {
 				input = input || (filter ? filter : '');
 				return new Promise((resolve) => {
-				const fuzzyResult = fuzzy.filter(input, Object.keys(packageJson.scripts));
+				const fuzzyResult = fuzzy.filter(input, scripts);
 				const data = fuzzyResult.map(element => element.original);
 				resolve(data);
 				});
 			},
-			choices: Object.keys(packageJson.scripts)
+			choices: scripts
 		})
 		.then(selected => {
-			runSelected(selected)
+			runSelected(selected);
 		})
 		.catch(err => errorMsg(`inquirer interview failed, \n${err}`));
 }
@@ -138,6 +157,8 @@ function userInterview () {
  * @param {string[]} selectedScripts - keys of package.json scripts
  */
 function runSelected({selectedScripts}) {
+  selectedScripts = selectedScripts.flatMap(item => item.split(',').map(s => s.trim())); 
+
 	if( selectedScripts && selectedScripts.length > 0 ) {
 		console.log(`\n[ ${chalk.green('running selected scripts')} ]`)
 		npmRunAll(selectedScripts, {
