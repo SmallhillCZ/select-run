@@ -74,13 +74,11 @@ const argv = yargs(hideBin(process.argv))
 		alias: 'g',
 		type: 'string',
 		description: 'Group provided scripts (comma-separated) under single option. Repeat for multiple groups.',
-		array: true,
 	})
 	.option('pre-select', {
 		alias: 'y',
 		type: 'string',
 		description: 'Pre-select scripts (include multiple times for multiple pre-selections).',
-		array: true,
 	})
 	.parse();
 
@@ -101,10 +99,30 @@ try {
 console.log(chalk.gray(`path: ${packageJsonPath}\n`));
 
 const packageJsonScripts = Object.keys(packageJson.scripts);
-const groupScripts = argv.group ?? [];
+const groupScripts = argv.group ? (Array.isArray(argv.group) ? argv.group : [argv.group]) : [];
+const preSelectedScripts = argv['pre-select'] ? (Array.isArray(argv['pre-select']) ? argv['pre-select'] : [argv['pre-select']]) : [];
 
 const scripts = [...groupScripts, ...packageJsonScripts];
 
+if (groupScripts) {
+	for (const group of groupScripts) {
+		const missingScripts = group
+			.split(',')
+			.map((script) => script.trim())
+			.filter((script) => !packageJsonScripts.includes(script));
+
+		if (missingScripts.length > 0) {
+			errorMsg(`grouped scripts not found in package.json: ${missingScripts.join(', ')}`);
+		}
+	}
+}
+
+if (preSelectedScripts) {
+	const missingPreSelected = preSelectedScripts.filter((script) => !scripts.includes(script));
+	if (missingPreSelected.length > 0) {
+		errorMsg(`pre-selected scripts not found: ${missingPreSelected.join(', ')}`);
+	}
+}
 /* add checkbox-plus to inquirer prompt type */
 inquirer.registerPrompt('checkbox-plus', require('inquirer-checkbox-plus-prompt'));
 userInterview();
@@ -115,7 +133,6 @@ userInterview();
  */
 function userInterview() {
 	const interviewMessage = `Select scripts -- (Press ${chalk.cyan('<space>')} to select,` + ` ${chalk.cyan('<return>')} to complete)` + `\n${chalk.yellow('filter')}: `;
-	const preSelectedScripts = argv['pre-select'] || [];
 
 	inquirer
 		.prompt({
