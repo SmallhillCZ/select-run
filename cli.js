@@ -74,7 +74,6 @@ const argv = yargs(hideBin(process.argv))
 		alias: 'g',
 		type: 'string',
 		description: 'Group selected scripts under a named group.',
-		array: true,
 	})
 	.parse();
 
@@ -99,6 +98,10 @@ const packageJsonScripts = Object.keys(packageJson.scripts);
 const scripts = [...packageJsonScripts];
 
 if (argv.group) {
+	if (!Array.isArray(argv.group)) {
+		argv.group = [argv.group];
+	}
+
 	argv.group.forEach((group) => {
 		const groupScripts = group
 			.split(',')
