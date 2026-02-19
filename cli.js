@@ -7,12 +7,15 @@
 'use strict';
 
 const chalk = require('chalk');
+const Conf = require('conf').default;
 const fuzzy = require('fuzzy');
 const path = require('path');
 const inquirer = require('inquirer');
 const npmRunAll = require('npm-run-all');
 const yargs = require('yargs');
 const { hideBin } = require('yargs/helpers');
+
+const config = new Conf({ projectName: 'select-run' });
 
 const packageJsonPath = path.join(process.cwd(), 'package.json');
 
@@ -98,6 +101,9 @@ try {
 
 console.log(chalk.gray(`path: ${packageJsonPath}\n`));
 
+const projectKey = packageJsonPath.replace(/[^a-zA-Z0-9]/g, '_');
+const lastSelections = config.get(projectKey, []);
+
 const packageJsonScripts = Object.keys(packageJson.scripts);
 const groupScripts = argv.group ? (Array.isArray(argv.group) ? argv.group : [argv.group]) : [];
 const preSelectedScripts = argv['pre-select'] ? (Array.isArray(argv['pre-select']) ? argv['pre-select'] : [argv['pre-select']]) : [];
@@ -142,7 +148,7 @@ function userInterview() {
 			pageSize: 15,
 			highlight: true,
 			searchable: true,
-			default: [filter, ...preSelectedScripts],
+			default: [filter, ...(preSelectedScripts.length > 0 ? preSelectedScripts : lastSelections)],
 			source: (_answersSoFar, input) => {
 				input = input || (filter ? filter : '');
 				return new Promise((resolve) => {
@@ -166,6 +172,7 @@ function userInterview() {
  */
 function runSelected({ selectedScripts }) {
 	selectedScripts = selectedScripts.flatMap((item) => item.split(',').map((s) => s.trim()));
+	config.set(projectKey, selectedScripts);
 
 	if (selectedScripts && selectedScripts.length > 0) {
 		console.log(`\n[ ${chalk.green('running selected scripts')} ]`);
