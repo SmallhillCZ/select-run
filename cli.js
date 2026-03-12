@@ -73,7 +73,12 @@ const argv = yargs(hideBin(process.argv))
 	.option('group', {
 		alias: 'g',
 		type: 'string',
-		description: 'Group selected scripts under a named group.',
+		description: 'Group provided scripts (comma-separated) under single option. Repeat for multiple groups.',
+	})
+	.option('pre-select', {
+		alias: 'y',
+		type: 'string',
+		description: 'Pre-select scripts (include multiple times for multiple pre-selections).',
 	})
 	.parse();
 
@@ -94,23 +99,30 @@ try {
 console.log(chalk.gray(`path: ${packageJsonPath}\n`));
 
 const packageJsonScripts = Object.keys(packageJson.scripts);
+const groupScripts = argv.group ? (Array.isArray(argv.group) ? argv.group : [argv.group]) : [];
+const preSelectedScripts = argv['pre-select'] ? (Array.isArray(argv['pre-select']) ? argv['pre-select'] : [argv['pre-select']]) : [];
 
-const scripts = [...packageJsonScripts];
+const scripts = [...groupScripts, ...packageJsonScripts];
 
-if (argv.group) {
-	if (!Array.isArray(argv.group)) {
-		argv.group = [argv.group];
-	}
-
-	argv.group.forEach((group) => {
-		const groupScripts = group
+if (groupScripts) {
+	for (const group of groupScripts) {
+		const missingScripts = group
 			.split(',')
 			.map((script) => script.trim())
-			.filter((script) => packageJsonScripts.includes(script));
-		scripts.unshift(groupScripts.join(', '));
-	});
+			.filter((script) => !packageJsonScripts.includes(script));
+
+		if (missingScripts.length > 0) {
+			errorMsg(`grouped scripts not found in package.json: ${missingScripts.join(', ')}`);
+		}
+	}
 }
 
+if (preSelectedScripts) {
+	const missingPreSelected = preSelectedScripts.filter((script) => !scripts.includes(script));
+	if (missingPreSelected.length > 0) {
+		errorMsg(`pre-selected scripts not found: ${missingPreSelected.join(', ')}`);
+	}
+}
 /* add checkbox-plus to inquirer prompt type */
 inquirer.registerPrompt('checkbox-plus', require('inquirer-checkbox-plus-prompt'));
 userInterview();
@@ -130,7 +142,7 @@ function userInterview() {
 			pageSize: 15,
 			highlight: true,
 			searchable: true,
-			default: [filter],
+			default: [filter, ...preSelectedScripts],
 			source: (_answersSoFar, input) => {
 				input = input || (filter ? filter : '');
 				return new Promise((resolve) => {
